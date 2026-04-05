@@ -17,14 +17,17 @@ spec:
           image: geertjanwielenga/temperature-simulator:latest
           ports:
             - containerPort: 8080
-          volumeMounts:
-            - name: connecthing-api
-              mountPath: /etc/connecthing-api
-              readOnly: true
-      volumes:
-        - name: connecthing-api
-          secret:
-            secretName: connecthing-api
+          env:
+            - name: API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: connecthing-api
+                  key: token
+            - name: PLATFORM_URL
+              valueFrom:
+                secretKeyRef:
+                  name: connecthing-api
+                  key: platform-url
 ---
 apiVersion: v1
 kind: Service
