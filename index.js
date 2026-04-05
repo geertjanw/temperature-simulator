@@ -1,54 +1,73 @@
 require('dotenv').config()
+const rp = require('request-promise');
 const deviceUUIDs = require('./devices.json');
+
+const token = process.env.API_TOKEN;
+const platformURL = process.env.PLATFORM_URL || 'https://demo.davra.com/';
 
 function randomIntFromInterval(min, max) {
     return Math.floor(Math.random() * (max - min + 1) + min);
 }
 
-function randomStatus() {
-    const statuses = ['nominal', 'warning', 'critical', 'optimal'];
-    return statuses[Math.floor(Math.random() * statuses.length)];
-}
-
 function deviceExist(UUID) {
-    return Promise.resolve({
-        totalRecords: 1,
-        records: [{ UUID }]
-    });
+    var options = {
+        method: 'GET',
+        url: platformURL + 'api/v1/devices/' + UUID,
+        rejectUnauthorized: false,
+        headers: {
+            'Authorization': 'Bearer ' + token
+        },
+        json: true,
+    };
+    return rp(options);
 }
 
 function sendToIotdata(payload) {
-    console.log(`[${new Date().toISOString()}] Simulated IoT data sent:`);
-    console.log(JSON.stringify(payload, null, 2));
-    return Promise.resolve();
+    var options = {
+        method: 'PUT',
+        url: platformURL + 'api/v1/iotdata',
+        rejectUnauthorized: false,
+        headers: {
+            'Authorization': 'Bearer ' + token
+        },
+        json: true,
+        body: payload
+    };
+
+    return rp(options).then(response => {
+        console.log(`[${new Date().toISOString()}] IoT data sent successfully`);
+    }).catch(error => {
+        console.error(`[${new Date().toISOString()}] Error sending IoT data:`, error.message);
+    });
 }
 
 function generateDataPoints(uuid) {
-    return [
-        {
-            "UUID": uuid,
-            "name": "engine.temperature_celsius",
-            "value": randomIntFromInterval(20, 120),
-            "msg_type": "datum",
-        }
-    ]
+    return [{
+        "UUID": uuid,
+        "name": "engine.temperature_celsius",
+        "value": randomIntFromInterval(40, 75),
+        "msg_type": "datum",
+    }];
 }
 
 function runAutomation() {
     console.log(`\n--- Running automation at ${new Date().toISOString()} ---`);
     deviceUUIDs.forEach(uuid => {
+        console.log('Processing device:', uuid);
         deviceExist(uuid).then(res => {
             if (res.totalRecords && res.records
                 && res.records[0]
                 && res.records[0].UUID == uuid) {
-                var datapoints = generateDataPoints(uuid)
-                sendToIotdata(datapoints)
+                var datapoints = generateDataPoints(uuid);
+                sendToIotdata(datapoints);
             } else {
-                console.error("No device matching :" + uuid)
+                console.error('No device matching:', uuid);
             }
-        })
-    })
+        }).catch(error => {
+            console.error('Error checking device:', error.message);
+        });
+    });
 }
 
-runAutomation()
-setInterval(runAutomation, 60000)
+runAutomation();
+setInterval(runAutomation, 60000);
